@@ -2,17 +2,17 @@
 
 // 이 컴포넌트는 사용자가 비디오 파일을 업로드하고 AI 기반 처리 후 다운로드할 수 있는 UI를 제공함
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Upload, FileVideo, CheckCircle, AlertCircle, Download } from "lucide-react"
+import { Upload, FileVideo, CheckCircle, AlertCircle, Download, Smartphone } from "lucide-react"
 
-const url = "https://driven-amused-tomcat.ngrok-free.app" 
+const url = "https://driven-amused-tomcat.ngrok-free.app"
 
 interface JobStatus {
-  status: "queued" | "processing" | "completed" | "failed" |  "converting"
+  status: "queued" | "processing" | "completed" | "failed" | "converting"
   progress: number
   error?: string
   output_file?: string
@@ -32,6 +32,66 @@ export function FileUploadCard() {
   // 에러 메시지
   const [error, setError] = useState<string | null>(null)
 
+  // Service Worker 및 Background Mode 추가
+  const [serviceWorkerReady, setServiceWorkerReady] = useState(false)
+  const [backgroundMode, setBackgroundMode] = useState(false)
+
+  // Service Worker 준비 상태 확인 및 메시지 리스너 설정
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(() => {
+        setServiceWorkerReady(true);
+
+        // 알림 권한 요청
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      });
+
+      // Service Worker 메시지 리스너
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data.type === 'JOB_STATUS_UPDATE') {
+          setJobStatus(event.data.status);
+        } else if (event.data.type === 'POLLING_ERROR') {
+          setError(event.data.error);
+        }
+      });
+    }
+  }, []);
+
+  // 페이지 가시성 변경 감지 및 백그라운드 폴링 위임
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (
+        document.hidden &&
+        jobId &&
+        jobStatus &&
+        (jobStatus.status === 'processing' || jobStatus.status === 'queued' || jobStatus.status === 'converting')
+      ) {
+        setBackgroundMode(true);
+        // Service Worker에 폴링 시작 요청
+        if (serviceWorkerReady) {
+          navigator.serviceWorker.ready.then((registration) => {
+            registration.active?.postMessage({
+              type: 'START_POLLING',
+              jobId,
+              apiUrl: url,
+            });
+          });
+        }
+      } else if (!document.hidden && backgroundMode) {
+        setBackgroundMode(false);
+        // 페이지가 다시 보이면 일반 폴링 재시작
+        if (jobId) {
+          pollJobStatus(jobId);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [jobId, jobStatus, serviceWorkerReady, backgroundMode]);
+
   // 사용자가 드롭한 파일을 상태에 저장하고 초기화 처리
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -48,7 +108,7 @@ export function FileUploadCard() {
       "video/*": [".mp4", ".mov", ".avi", ".mkv"],
     },
     maxFiles: 1,
-    maxSize: 1 * 1024 * 1024 * 1024, // 2GB
+    maxSize: 1 * 1024 * 1024 * 1024, // 1GB
   })
 
   // 파일을 서버로 업로드하고 처리 요청을 전송하는 함수
@@ -82,6 +142,7 @@ export function FileUploadCard() {
         const result = JSON.parse(xhr.responseText)
         setJobId(result.job_id)
         setUploading(false)
+        // 업로드 완료 후 폴링 시작
         pollJobStatus(result.job_id)
       }
 
@@ -102,6 +163,9 @@ export function FileUploadCard() {
 
   // 주기적으로 백엔드로부터 작업 상태를 확인하는 함수
   const pollJobStatus = async (id: string) => {
+    // 백그라운드 모드이면 폴링 중단 (Service Worker가 처리)
+    if (backgroundMode) return;
+
     const statusUrl = `${url}/status/${id}`
     try {
       const response = await fetch(statusUrl, {
@@ -119,13 +183,16 @@ export function FileUploadCard() {
 
       setJobStatus(status)
       // 작업이 완료되지 않았으면 계속 폴링
-      if (status.status === "queued" || status.status === "processing") {
-        setTimeout(() => pollJobStatus(id), 2000) // 2초마다 확인
-      }
-      if (status.status === "converting"){
-        setTimeout(() => pollJobStatus(id), 5000) // 2초마다 확인
+      if (!document.hidden && (status.status === "queued" || status.status === "processing")) {
+        setTimeout(() => pollJobStatus(id), 2000)
+      } else if (!document.hidden && status.status === "converting") {
+        setTimeout(() => pollJobStatus(id), 5000)
       }
     } catch (err) {
+      // 네트워크 오류 시 재시도 로직
+      if (!document.hidden) {
+        setTimeout(() => pollJobStatus(id), 5000)
+      }
       setError(err instanceof Error ? err.message : "Failed to get status")
     }
   }
@@ -168,6 +235,7 @@ export function FileUploadCard() {
     setJobStatus(null)
     setJobId(null)
     setError(null)
+    setBackgroundMode(false)
   }
 
   // 작업 상태에 따라 사용자에게 보여줄 메시지를 반환
@@ -195,6 +263,13 @@ export function FileUploadCard() {
     <Card className="w-full bg-gray-900 border-gray-800">
       <CardHeader>
         <CardTitle className="text-center text-2xl">영상 업로드 및 AI 처리</CardTitle>
+        {/* 백그라운드 모드 표시 */}
+        {backgroundMode && (
+          <div className="flex items-center justify-center gap-2 p-2 bg-blue-900/20 rounded-lg">
+            <Smartphone className="h-4 w-4 text-blue-400" />
+            <span className="text-sm text-blue-400">백그라운드에서 처리 중 - 알림으로 완료를 확인하세요</span>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {/* 파일이 선택되지 않은 상태: 드래그 앤 드롭 영역 표시 */}
@@ -216,7 +291,7 @@ export function FileUploadCard() {
             <Button variant="outline" className="border-gray-700">
               파일 찾기
             </Button>
-            <p className="mt-4 text-xs text-gray-500">지원 형식: MP4, MOV, AVI, MKV (최대 2GB)</p>
+            <p className="mt-4 text-xs text-gray-500">지원 형식: MP4, MOV, AVI, MKV (최대 1GB)</p>
           </div>
         )}
 
@@ -287,10 +362,10 @@ export function FileUploadCard() {
       {/* 하단 버튼 렌더링 조건 */}
       <CardFooter className="flex justify-center gap-4">
         {file && !jobStatus && !uploading && (
-          <Button 
-            onClick={uploadAndProcess} 
+          <Button
+            onClick={uploadAndProcess}
             className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-            >
+          >
             AI 처리 시작
           </Button>
         )}
