@@ -9,7 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Progress } from "@/components/ui/progress"
 import { Upload, FileVideo, CheckCircle, AlertCircle, Download } from "lucide-react"
 
-const url = "driven-amused-tomcat.ngrok-free.app" 
+const url = "https://driven-amused-tomcat.ngrok-free.app" 
 
 interface JobStatus {
   status: "queued" | "processing" | "completed" | "failed" |  "converting"
