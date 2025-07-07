@@ -48,7 +48,7 @@ async function startPolling(jobId, apiUrl) {
           body: status.status === 'completed' 
             ? '영상 처리가 완료되었습니다!' 
             : '영상 처리 중 오류가 발생했습니다.',
-          icon: '/icon-192x192.png',
+          icon: '/icon-192x192.svg',
           badge: '/badge-72x72.png',
           tag: 'video-processing'
         });
