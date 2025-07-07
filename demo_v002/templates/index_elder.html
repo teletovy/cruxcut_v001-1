@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>O-CAE-Auto-Camera-Editing-Service-for-Climbers</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            text-align: center;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        .download-btn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+        #status {
+            margin: 20px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>O-CAE: Auto-Camera-Editing-Service-for-Climbers</h1>
+        <p>30초 이하의 클라이밍 영상을 업로드하시면, 자동으로 영상을 편집해드립니다.</p>
+        
+        <input type="file" id="videoInput" accept="video/mp4">
+        <div id="status"></div>
+        <div class="progress-bar" id="progressBar">
+            <div class="progress" id="progress"></div>
+        </div>
+        <button id="downloadBtn" class="download-btn">결과 비디오 다운로드</button>
+    </div>
+
+    <script>
+        const videoInput = document.getElementById('videoInput');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const progress = document.getElementById('progress');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        let currentFileId = null;
+
+        videoInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // UI 초기화
+            status.textContent = "비디오 업로드 중...";
+            progressBar.style.display = 'block';
+            progress.style.width = '0%';
+            downloadBtn.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/process-video', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentFileId = data.file_id;
+                    status.textContent = data.message;
+                    progress.style.width = '100%';
+                    downloadBtn.style.display = 'block';
+                } else {
+                    status.textContent = data.message;
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                status.textContent = "처리 중 오류가 발생했습니다.";
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (currentFileId) {
+                window.location.href = `/download/${currentFileId}`;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+
+# Ignore all video files in the scripts (processed, temp, and upload directories)
+scripts/processed
+scripts/temp
+scripts/uploads
+scripts/climbing_videos
+
+# Ignore all files in the input, output, experimetns directories
+input/*
+output/*
+exps/*
+
+# Ignore __pycache__ directories
+**/__pycache__
+scripts/__pycache__
+demo_v002/app/__pycache__
+
+# Frontend node_modules
+crux-cut/node_modules
+crux-cut/.next
+crux-cut/.env.local
+
+# Ignore .pt files
+*.pt

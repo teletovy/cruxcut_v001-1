@@ -1,0 +1,12 @@
+{
+    "projectId": "prj_CvNH5Q7wUaN4AwUzxfTFWsFrCSEl",
+    "orgId": "team_lHv1kqODBdCtYJGuhSl4mYBC",
+    "settings":{
+        "framework": "nextjs",
+        "rootDirectory": "crux-cut",
+        "buildCommand": "npm run build",
+        "developmentCommand": "npm run dev",
+        "outputDirectory": ".next",
+        "installCommand": "npm install"
+    }
+}
