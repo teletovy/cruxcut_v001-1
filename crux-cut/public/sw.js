@@ -44,15 +44,34 @@ async function startPolling(jobId, apiUrl) {
         clearInterval(pollingInterval);
         
         // 완료 알림 표시
-        self.registration.showNotification('CruxCut 처리 완료', {
-          body: status.status === 'completed' 
-            ? '영상 처리가 완료되었습니다!' 
-            : '영상 처리 중 오류가 발생했습니다.',
-          icon: '/icon-192x192.svg',
-          badge: '/badge-72x72.png',
-          tag: 'video-processing'
-        });
+        
+        // self.registration.showNotification('CruxCut 처리 완료', {
+        //   body: status.status === 'completed' 
+        //     ? '영상 처리가 완료되었습니다!' 
+        //     : '영상 처리 중 오류가 발생했습니다.',
+        //   icon: '/icon-192x192.svg',
+        //   badge: '/badge-72x72.png',
+        //   tag: 'video-processing'
+        // });
+        // 완료 알림 표시 (권한 체크 및 에러 핸들링 추가)
+        if (Notification.permission === 'granted') {
+          try {
+            self.registration.showNotification('CruxCut 처리 완료', {
+              body: status.status === 'completed' 
+                ? '영상 처리가 완료되었습니다!' 
+                : '영상 처리 중 오류가 발생했습니다.',
+              icon: '/icon-192x192.svg',
+              badge: '/badge-72x72.png',
+              tag: 'video-processing'
+            });
+          } catch (error) {
+            console.log('알림 표시 실패:', error);
+          }
+        } else {
+          console.log('알림 권한이 없습니다:', Notification.permission);
+        }
       }
+      
     } catch (error) {
       console.error('Polling error:', error);
       
